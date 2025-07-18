@@ -1,0 +1,62 @@
+{
+  "manifest_version": 3,
+  "name": "Notions Words - 智能翻译助手",
+  "version": "1.0.0",
+  "description": "一个功能强大的浏览器翻译插件，支持将单词和翻译结果保存到Notion数据库",
+  
+  "permissions": [
+    "storage",
+    "activeTab",
+    "contextMenus",
+    "notifications"
+  ],
+  
+  "host_permissions": [
+    "https://api.notion.com/*",
+    "https://translate.googleapis.com/*",
+    "https://api-free.deepl.com/*"
+  ],
+  
+  "background": {
+    "service_worker": "src/app/background/index.ts",
+    "type": "module"
+  },
+  
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/app/content/index.ts"]
+    }
+  ],
+  
+  "action": {
+    "default_popup": "src/app/popup/index.html",
+    "default_title": "Notions Words"
+  },
+  
+  "options_page": "src/app/options/index.html",
+  
+  "commands": {
+    "translate-selection": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+T",
+        "mac": "Command+Shift+T"
+      },
+      "description": "翻译选中的文本"
+    },
+    "toggle-auto-translation": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+A",
+        "mac": "Command+Shift+A"
+      },
+      "description": "切换自动翻译模式"
+    }
+  },
+  
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+} 
