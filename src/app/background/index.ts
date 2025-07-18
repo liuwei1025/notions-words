@@ -99,10 +99,13 @@ class BackgroundScript {
   }
 
   private setupContextMenu() {
-    chrome.contextMenus.create({
-      id: 'translate-selection',
-      title: '翻译选中文本',
-      contexts: ['selection']
+    // 先清除所有现有的上下文菜单项，避免重复创建
+    chrome.contextMenus.removeAll(() => {
+      chrome.contextMenus.create({
+        id: 'translate-selection',
+        title: '翻译选中文本',
+        contexts: ['selection']
+      })
     })
 
     chrome.contextMenus.onClicked.addListener((info, tab) => {

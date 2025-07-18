@@ -9,6 +9,12 @@ import {
   createUserConfig,
   isValidUserConfig
 } from '@/entities/user-config'
+import { 
+  extractDatabaseId, 
+  isValidDatabaseId, 
+  DATABASE_ID_HELP,
+  extractDatabaseIdFromClipboard 
+} from '@/shared/utils/notion-helper'
 
 // 创建类型安全的存储实例
 const userConfigStorage = new TypedStorage<UserConfig>('user-config', DEFAULT_USER_CONFIG)
@@ -18,6 +24,8 @@ const OptionsApp: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [showDatabaseHelp, setShowDatabaseHelp] = useState(false)
+  const [urlInput, setUrlInput] = useState('')
 
   // 加载配置
   useEffect(() => {
@@ -68,6 +76,56 @@ const OptionsApp: React.FC = () => {
     if (confirm('确定要重置为默认设置吗？此操作不可恢复。')) {
       setConfig(createUserConfig())
       showMessage('success', '已重置为默认设置')
+    }
+  }
+
+  // 从URL提取数据库ID
+  const handleExtractDatabaseId = () => {
+    if (!urlInput.trim()) {
+      showMessage('error', '请先输入 Notion 数据库的 URL')
+      return
+    }
+
+    const extractedId = extractDatabaseId(urlInput)
+    if (extractedId) {
+      updateConfig({
+        notionIntegration: {
+          ...config.notionIntegration,
+          token: config.notionIntegration?.token || '',
+          databaseId: extractedId,
+          fieldMapping: config.notionIntegration?.fieldMapping || {} as any,
+          autoSync: config.notionIntegration?.autoSync || false,
+          syncInterval: config.notionIntegration?.syncInterval || 300
+        }
+      })
+      setUrlInput('')
+      showMessage('success', `成功提取数据库 ID: ${extractedId}`)
+    } else {
+      showMessage('error', '无法从 URL 中提取数据库 ID，请检查 URL 格式')
+    }
+  }
+
+  // 从剪贴板提取数据库ID
+  const handleExtractFromClipboard = async () => {
+    try {
+      const extractedId = await extractDatabaseIdFromClipboard()
+      if (extractedId) {
+        updateConfig({
+          notionIntegration: {
+            ...config.notionIntegration,
+            token: config.notionIntegration?.token || '',
+            databaseId: extractedId,
+            fieldMapping: config.notionIntegration?.fieldMapping || {} as any,
+            autoSync: config.notionIntegration?.autoSync || false,
+            syncInterval: config.notionIntegration?.syncInterval || 300
+          }
+        })
+        showMessage('success', `从剪贴板成功提取数据库 ID: ${extractedId}`)
+      } else {
+        showMessage('error', '剪贴板中没有找到有效的 Notion 数据库 URL')
+      }
+    } catch (error) {
+      showMessage('error', '无法访问剪贴板，请手动输入 URL')
     }
   }
 
@@ -236,25 +294,129 @@ const OptionsApp: React.FC = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  数据库 ID
-                </label>
-                <input 
-                  type="text" 
-                  placeholder="输入 Notion 数据库 ID"
-                  value={config.notionIntegration?.databaseId || ''}
-                  onChange={(e) => updateConfig({
-                    notionIntegration: {
-                      ...config.notionIntegration,
-                      token: config.notionIntegration?.token || '',
-                      databaseId: e.target.value,
-                      fieldMapping: config.notionIntegration?.fieldMapping || {} as any,
-                      autoSync: config.notionIntegration?.autoSync || false,
-                      syncInterval: config.notionIntegration?.syncInterval || 300
-                    }
-                  })}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm"
-                />
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-medium text-gray-700">
+                    数据库 ID
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowDatabaseHelp(!showDatabaseHelp)}
+                    className="text-xs text-purple-600 hover:text-purple-800 underline flex items-center space-x-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>找不到数据库 ID？</span>
+                  </button>
+                </div>
+                
+                {showDatabaseHelp && (
+                  <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl">
+                    <h4 className="font-medium text-purple-900 mb-3 flex items-center">
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {DATABASE_ID_HELP.title}
+                    </h4>
+                    <ol className="list-decimal list-inside space-y-1 text-sm text-purple-800 mb-4">
+                      {DATABASE_ID_HELP.steps.map((step, index) => (
+                        <li key={index}>{step}</li>
+                      ))}
+                    </ol>
+                    
+                    <div className="space-y-3">
+                      <label className="block text-xs font-medium text-purple-900">
+                        🔗 粘贴数据库 URL，自动提取 ID：
+                      </label>
+                      <div className="flex space-x-2">
+                        <input
+                          type="text"
+                          placeholder="https://www.notion.so/your-database-url"
+                          value={urlInput}
+                          onChange={(e) => setUrlInput(e.target.value)}
+                          className="flex-1 border border-purple-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleExtractDatabaseId}
+                          className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 transition-colors flex items-center space-x-1"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                          </svg>
+                          <span>提取</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleExtractFromClipboard}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors flex items-center space-x-1"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                          </svg>
+                          <span>剪贴板</span>
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-3 p-2 bg-white/50 rounded-lg">
+                      <p className="text-xs text-purple-700">
+                        <strong>💡 提示：</strong> {DATABASE_ID_HELP.format}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    placeholder="输入 Notion 数据库 ID 或使用上方工具自动提取"
+                    value={config.notionIntegration?.databaseId || ''}
+                    onChange={(e) => updateConfig({
+                      notionIntegration: {
+                        ...config.notionIntegration,
+                        token: config.notionIntegration?.token || '',
+                        databaseId: e.target.value,
+                        fieldMapping: config.notionIntegration?.fieldMapping || {} as any,
+                        autoSync: config.notionIntegration?.autoSync || false,
+                        syncInterval: config.notionIntegration?.syncInterval || 300
+                      }
+                    })}
+                    className={`w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm ${
+                      config.notionIntegration?.databaseId && !isValidDatabaseId(config.notionIntegration.databaseId)
+                        ? 'border-red-300 focus:ring-red-500' 
+                        : 'border-gray-200 focus:ring-purple-500'
+                    }`}
+                  />
+                  {config.notionIntegration?.databaseId && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      {isValidDatabaseId(config.notionIntegration.databaseId) ? (
+                        <div className="flex items-center space-x-1 text-green-600">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="text-xs">有效</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-1 text-red-600">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          <span className="text-xs">无效</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                
+                {config.notionIntegration?.databaseId && !isValidDatabaseId(config.notionIntegration.databaseId) && (
+                  <p className="text-xs text-red-600 mt-2 flex items-center space-x-1">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.863-.833-2.633 0L4.168 15.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <span>数据库 ID 格式不正确，应为 32 位字母数字组合</span>
+                  </p>
+                )}
               </div>
 
               <div>
