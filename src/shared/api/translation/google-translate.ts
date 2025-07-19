@@ -39,6 +39,12 @@ export class GoogleTranslateAPI {
     word: Word,
     targetLanguage: string
   ): Promise<Translation> {
+    // 如果没有配置API key，使用免费的Google翻译（模拟）
+    if (!this.config.apiKey) {
+      console.warn('Google翻译API key未配置，使用模拟翻译')
+      return this.getMockTranslation(word, targetLanguage)
+    }
+
     try {
       const response = await this.makeRequest({
         q: word.text,
@@ -107,11 +113,12 @@ export class GoogleTranslateAPI {
     source?: string
     format?: string
   }): Promise<GoogleTranslateResponse> {
-    const url = new URL(this.baseUrl)
-    
-    if (this.config.apiKey) {
-      url.searchParams.set('key', this.config.apiKey)
+    if (!this.config.apiKey) {
+      throw new Error('Google翻译API key未配置')
     }
+
+    const url = new URL(this.baseUrl)
+    url.searchParams.set('key', this.config.apiKey)
 
     const response = await fetch(url.toString(), {
       method: 'POST',
@@ -133,6 +140,38 @@ export class GoogleTranslateAPI {
    */
   private generateTranslationId(): string {
     return `google_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  }
+
+  /**
+   * 获取模拟翻译结果（当没有API key时）
+   */
+  private getMockTranslation(word: Word, targetLanguage: string): Translation {
+    // 创建一个简单的模拟翻译结果
+    const mockTranslations: Record<string, string> = {
+      'hello': '你好',
+      'world': '世界',
+      'translate': '翻译',
+      'test': '测试',
+      'example': '示例',
+      'word': '单词',
+      'text': '文本',
+      'language': '语言'
+    }
+
+    const translatedText = mockTranslations[word.text.toLowerCase()] || 
+                          `[模拟翻译] ${word.text}`;
+
+    return {
+      originalWord: word,
+      result: {
+        text: translatedText,
+        targetLanguage,
+      },
+      provider: TranslationProvider.GOOGLE,
+      confidence: 0.5, // 模拟翻译置信度较低
+      timestamp: Date.now(),
+      id: this.generateTranslationId()
+    }
   }
 
   /**
